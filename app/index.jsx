@@ -8,6 +8,9 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Animated,
+  Modal,
+  TextInput,
+  TouchableOpacity,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { getPlants } from "../database/database";
@@ -19,6 +22,9 @@ export default function PlantList() {
   const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(true);
   const scrollY = new Animated.Value(0);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredPlants, setFilteredPlants] = useState([]);
 
   const fetchPlants = async () => {
     try {
@@ -37,6 +43,17 @@ export default function PlantList() {
       fetchPlants();
     }, [])
   );
+
+  const filterPlants = (query) => {
+    const searchTerm = query.toLowerCase();
+    return plants.filter(
+      (plant) =>
+        plant.name.toLowerCase().includes(searchTerm) ||
+        plant.wateringNeeds?.toLowerCase().includes(searchTerm) ||
+        plant.sunlight?.toLowerCase().includes(searchTerm) ||
+        plant.soilType?.toLowerCase().includes(searchTerm)
+    );
+  };
 
   const renderHeader = () => {
     const translateY = scrollY.interpolate({
@@ -58,17 +75,159 @@ export default function PlantList() {
           <View>
             <Text style={styles.headerTitle}>Garden Logger</Text>
             <Text style={styles.headerSubtitle}>
-              {plants.length} {plants.length === 1 ? "plant" : "plants"} in your
-              garden
+              {(searchQuery ? filteredPlants : plants).length}{" "}
+              {(searchQuery ? filteredPlants : plants).length === 1
+                ? "plant"
+                : "plants"}{" "}
+              in your garden
             </Text>
           </View>
-          <Pressable style={styles.searchButton}>
+          <Pressable
+            style={styles.searchButton}
+            onPress={() => setIsSearchVisible(true)}
+          >
             <Ionicons name="search-outline" size={24} color={colors.surface} />
           </Pressable>
         </View>
       </Animated.View>
     );
   };
+
+  const renderSearchResult = (plant, searchTerm) => {
+    const highlightMatches = (text, term) => {
+      if (!text) return null;
+      const parts = text.split(new RegExp(`(${term})`, "gi"));
+      return (
+        <Text>
+          {parts.map((part, i) =>
+            part.toLowerCase() === term.toLowerCase() ? (
+              <Text
+                key={i}
+                style={{
+                  backgroundColor: colors.primary + "40",
+                  color: colors.primary,
+                }}
+              >
+                {part}
+              </Text>
+            ) : (
+              <Text key={i}>{part}</Text>
+            )
+          )}
+        </Text>
+      );
+    };
+
+    const matches = [];
+
+    if (plant.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+      matches.push({
+        label: "Name",
+        value: plant.name,
+      });
+    }
+    if (plant.wateringNeeds?.toLowerCase().includes(searchTerm.toLowerCase())) {
+      matches.push({
+        label: "Watering",
+        value: plant.wateringNeeds,
+      });
+    }
+    if (plant.sunlight?.toLowerCase().includes(searchTerm.toLowerCase())) {
+      matches.push({
+        label: "Sunlight",
+        value: plant.sunlight,
+      });
+    }
+    if (plant.soilType?.toLowerCase().includes(searchTerm.toLowerCase())) {
+      matches.push({
+        label: "Soil",
+        value: plant.soilType,
+      });
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.searchResultItem}
+        onPress={() => {
+          router.push(`/${plant.id}`);
+          setIsSearchVisible(false);
+          setSearchQuery("");
+          setFilteredPlants([]);
+        }}
+      >
+        <View style={styles.searchResultIcon}>
+          <Ionicons name="leaf" size={24} color={colors.primary} />
+        </View>
+        <View style={styles.searchResultContent}>
+          <Text style={styles.searchResultTitle}>{plant.name}</Text>
+          {matches.map((match, index) => (
+            <View key={index} style={styles.searchMatch}>
+              <Text style={styles.searchMatchLabel}>{match.label}: </Text>
+              {highlightMatches(match.value, searchTerm)}
+            </View>
+          ))}
+        </View>
+        <Ionicons name="chevron-forward" size={24} color={colors.grey} />
+      </TouchableOpacity>
+    );
+  };
+
+  const renderSearchModal = () => (
+    <Modal
+      visible={isSearchVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setIsSearchVisible(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.searchModalContent}>
+          <View style={styles.searchInputContainer}>
+            <Ionicons
+              name="search"
+              size={20}
+              color={colors.grey}
+              style={{ marginRight: 8 }}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search plants..."
+              value={searchQuery}
+              onChangeText={(text) => {
+                setSearchQuery(text);
+                setFilteredPlants(filterPlants(text));
+              }}
+              autoFocus
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={() => {
+                  setSearchQuery("");
+                  setFilteredPlants([]);
+                }}
+              >
+                <Ionicons name="close-circle" size={20} color={colors.grey} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+        {searchQuery.length > 0 && (
+          <FlatList
+            data={filteredPlants}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => renderSearchResult(item, searchQuery)}
+            style={styles.searchResults}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              <View style={styles.noResults}>
+                <Text style={styles.noResultsText}>No plants found</Text>
+              </View>
+            }
+          />
+        )}
+      </View>
+    </Modal>
+  );
 
   const renderPlantCard = ({ item }) => (
     <Pressable
@@ -116,8 +275,9 @@ export default function PlantList() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {renderSearchModal()}
       <Animated.FlatList
-        data={plants}
+        data={searchQuery ? filteredPlants : plants}
         renderItem={renderPlantCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -126,7 +286,11 @@ export default function PlantList() {
           <View style={styles.emptyStateContainer}>
             <EmptyState
               icon="leaf"
-              message="No plants yet. Start growing your garden!"
+              message={
+                searchQuery
+                  ? "No plants match your search"
+                  : "No plants yet. Start growing your garden!"
+              }
             />
           </View>
         }
@@ -279,5 +443,88 @@ const styles = StyleSheet.create({
   },
   emptyStateContainer: {
     marginTop: 32,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  searchModalContent: {
+    backgroundColor: colors.surface + "F0",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.grey + "33",
+    backdropFilter: "blur(10px)",
+  },
+  searchInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.background + "F0",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+  },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    fontSize: 16,
+    color: colors.text,
+  },
+  closeButton: {
+    padding: 8,
+  },
+  searchResultItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: colors.surface + "F0",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.grey + "20",
+    marginHorizontal: 8,
+    marginVertical: 4,
+    borderRadius: 12,
+  },
+  searchResultIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary + "20",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  searchResultContent: {
+    flex: 1,
+  },
+  searchResultTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text,
+    marginBottom: 4,
+  },
+  searchMatch: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  searchMatchLabel: {
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  searchResults: {
+    backgroundColor: "transparent",
+  },
+  noResults: {
+    padding: 16,
+    alignItems: "center",
+    backgroundColor: colors.surface + "F0",
+    margin: 8,
+    borderRadius: 12,
+  },
+  noResultsText: {
+    color: colors.textSecondary,
+    fontSize: 16,
+  },
+  clearButton: {
+    padding: 8,
   },
 });

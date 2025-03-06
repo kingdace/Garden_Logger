@@ -6,6 +6,7 @@ import {
   Alert,
   Text,
   ScrollView,
+  StyleSheet,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { getPlantById, updatePlant } from "../../database/database";
@@ -79,20 +80,16 @@ export default function EditPlantForm() {
 
   return (
     <ScrollView style={globalStyles.container}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
+      <View style={styles.header}>
+        <View style={styles.iconContainer}>
+          <Ionicons name="create-outline" size={32} color={colors.primary} />
+        </View>
         <TouchableOpacity
           style={globalStyles.headerButton}
           onPress={handleBack}
         >
           <Ionicons name="close" size={24} color={colors.grey} />
         </TouchableOpacity>
-        <Text style={globalStyles.title}>Edit Plant</Text>
       </View>
 
       <Text style={globalStyles.label}>Plant Name *</Text>
@@ -153,3 +150,15 @@ export default function EditPlantForm() {
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  iconContainer: {
+    padding: 8,
+  },
+});

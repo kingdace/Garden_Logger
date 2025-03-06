@@ -7,6 +7,10 @@ import {
   TouchableOpacity,
   ScrollView,
   Share,
+  Platform,
+  Modal,
+  TextInput,
+  StyleSheet,
 } from "react-native";
 import {
   useLocalSearchParams,
@@ -37,6 +41,8 @@ export default function PlantDetail() {
   const [logs, setLogs] = useState([]);
   const [growth, setGrowth] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isGrowthModalVisible, setIsGrowthModalVisible] = useState(false);
+  const [growthHeight, setGrowthHeight] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -126,33 +132,72 @@ export default function PlantDetail() {
     router.replace("/");
   };
 
+  const handleGrowthSubmit = async () => {
+    if (growthHeight) {
+      const record = {
+        plantId: id,
+        height: parseInt(growthHeight),
+        status:
+          parseInt(growthHeight) > (growth[growth.length - 1]?.height || 0)
+            ? "thriving"
+            : "stable",
+        notes: `Height recorded: ${growthHeight}cm`,
+      };
+      await addGrowthRecord(record);
+      setIsGrowthModalVisible(false);
+      setGrowthHeight("");
+      fetchData();
+    }
+  };
+
   const handleAddGrowth = () => {
-    Alert.prompt(
-      "Add Growth Record",
-      "Enter plant height in centimeters",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Add",
-          onPress: async (height) => {
-            if (height) {
-              const record = {
-                plantId: id,
-                height: parseInt(height),
-                status:
-                  height > (growth[growth.length - 1]?.height || 0)
-                    ? "thriving"
-                    : "stable",
-                notes: `Height recorded: ${height}cm`,
-              };
-              await addGrowthRecord(record);
-              fetchData();
-            }
+    if (Platform.OS === "web") {
+      const height = window.prompt("Enter plant height in centimeters");
+      if (height) {
+        addGrowthRecord({
+          plantId: id,
+          height: parseInt(height),
+          status:
+            height > (growth[growth.length - 1]?.height || 0)
+              ? "thriving"
+              : "stable",
+          notes: `Height recorded: ${height}cm`,
+        }).then(() => {
+          fetchData();
+        });
+      }
+    } else if (Platform.OS === "ios") {
+      // iOS specific Alert.prompt
+      Alert.prompt(
+        "Add Growth Record",
+        "Enter plant height in centimeters",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Add",
+            onPress: async (height) => {
+              if (height) {
+                const record = {
+                  plantId: id,
+                  height: parseInt(height),
+                  status:
+                    height > (growth[growth.length - 1]?.height || 0)
+                      ? "thriving"
+                      : "stable",
+                  notes: `Height recorded: ${height}cm`,
+                };
+                await addGrowthRecord(record);
+                fetchData();
+              }
+            },
           },
-        },
-      ],
-      "plain-text"
-    );
+        ],
+        "plain-text"
+      );
+    } else {
+      // Show modal for Android
+      setIsGrowthModalVisible(true);
+    }
   };
 
   if (loading) return <Loading />;
@@ -268,6 +313,90 @@ export default function PlantDetail() {
         renderItem={({ item }) => <CareLogItem log={item} />}
         scrollEnabled={false}
       />
+
+      <Modal
+        visible={isGrowthModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsGrowthModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Growth Record</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter height in centimeters"
+              keyboardType="numeric"
+              value={growthHeight}
+              onChangeText={setGrowthHeight}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => {
+                  setIsGrowthModalVisible(false);
+                  setGrowthHeight("");
+                }}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.submitButton]}
+                onPress={handleGrowthSubmit}
+              >
+                <Text style={styles.buttonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    padding: 20,
+    borderRadius: 12,
+    width: "80%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.grey,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  button: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  cancelButton: {
+    backgroundColor: colors.grey,
+  },
+  submitButton: {
+    backgroundColor: colors.primary,
+  },
+  buttonText: {
+    color: colors.surface,
+    fontWeight: "600",
+  },
+});

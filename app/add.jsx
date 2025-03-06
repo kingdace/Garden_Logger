@@ -6,6 +6,7 @@ import {
   Alert,
   Text,
   ScrollView,
+  StyleSheet,
 } from "react-native";
 import { router } from "expo-router";
 import { addPlant } from "../database/database";
@@ -62,23 +63,19 @@ export default function AddPlantForm() {
 
   return (
     <ScrollView style={globalStyles.container}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
+      <View style={styles.header}>
+        <View style={styles.iconContainer}>
+          <Ionicons name="leaf-outline" size={32} color={colors.primary} />
+        </View>
         <TouchableOpacity
           style={globalStyles.headerButton}
           onPress={handleBack}
         >
           <Ionicons name="close" size={24} color={colors.grey} />
         </TouchableOpacity>
-        <Text style={globalStyles.title}>Add a New Plant</Text>
       </View>
 
-      <Text style={globalStyles.label}>Plant Name *</Text>
+      <Text style={globalStyles.label}>Plant Name</Text>
       <TextInput
         style={globalStyles.input}
         placeholder="Enter plant name"
@@ -136,3 +133,15 @@ export default function AddPlantForm() {
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  iconContainer: {
+    padding: 8,
+  },
+});
