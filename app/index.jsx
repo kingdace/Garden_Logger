@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,9 @@ import { getPlants } from "../database/database";
 import { colors } from "../styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { EmptyState } from "../components/EmptyState";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { PlantCard } from "../components/PlantCard";
+import * as Notifications from "expo-notifications";
 
 export default function PlantList() {
   const [plants, setPlants] = useState([]);
@@ -25,13 +28,76 @@ export default function PlantList() {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredPlants, setFilteredPlants] = useState([]);
+  const [reminders, setReminders] = useState({});
+
+  const checkAllReminders = async (plants) => {
+    const reminderStatuses = {};
+    for (const plant of plants) {
+      try {
+        const reminder = await AsyncStorage.getItem(`reminder_${plant.id}`);
+        if (reminder) {
+          try {
+            const reminderData = JSON.parse(reminder);
+            if (reminderData && typeof reminderData === "object") {
+              reminderStatuses[plant.id] = {
+                active: true,
+                interval: reminderData.interval || 1,
+                timeUnit: reminderData.timeUnit || "days",
+                nextNotification:
+                  reminderData.nextNotification || new Date().toISOString(),
+              };
+            } else {
+              await AsyncStorage.removeItem(`reminder_${plant.id}`);
+            }
+          } catch (parseError) {
+            console.log(
+              `Invalid reminder data for plant ${plant.id}, removing...`
+            );
+            await AsyncStorage.removeItem(`reminder_${plant.id}`);
+          }
+        }
+      } catch (error) {
+        console.log(`Error checking reminder for plant ${plant.id}:`, error);
+        await AsyncStorage.removeItem(`reminder_${plant.id}`);
+      }
+    }
+    setReminders(reminderStatuses);
+  };
+
+  const cleanupAsyncStorage = async () => {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const reminderKeys = allKeys.filter((key) => key.startsWith("reminder_"));
+
+      for (const key of reminderKeys) {
+        try {
+          const value = await AsyncStorage.getItem(key);
+          if (value) {
+            JSON.parse(value);
+          }
+        } catch (error) {
+          await AsyncStorage.removeItem(key);
+          console.log(`Removed invalid reminder data for key: ${key}`);
+        }
+      }
+    } catch (error) {
+      console.log("Error cleaning up AsyncStorage:", error);
+    }
+  };
 
   const fetchPlants = async () => {
     try {
+      setLoading(true);
       const plantsData = await getPlants();
-      setPlants(plantsData || []);
+      if (Array.isArray(plantsData)) {
+        setPlants(plantsData);
+        await checkAllReminders(plantsData);
+      } else {
+        console.log("Invalid plants data:", plantsData);
+        setPlants([]);
+      }
     } catch (error) {
-      console.error("Error:", error);
+      console.log("Error fetching plants:", error);
       setPlants([]);
     } finally {
       setLoading(false);
@@ -43,6 +109,38 @@ export default function PlantList() {
       fetchPlants();
     }, [])
   );
+
+  useEffect(() => {
+    cleanupAsyncStorage();
+
+    Notifications.requestPermissionsAsync().then(({ status }) => {
+      if (status !== "granted") {
+        alert("You won't receive reminders without notification permissions!");
+      }
+    });
+
+    const subscription = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        const plantId = notification.request.content.data.plantId;
+      }
+    );
+
+    const responseSubscription =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        const plantId = response.notification.request.content.data.plantId;
+        if (plantId) {
+          router.push({
+            pathname: "/[id]",
+            params: { id: plantId },
+          });
+        }
+      });
+
+    return () => {
+      subscription.remove();
+      responseSubscription.remove();
+    };
+  }, []);
 
   const filterPlants = (query) => {
     const searchTerm = query.toLowerCase();
@@ -73,7 +171,7 @@ export default function PlantList() {
       >
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.headerTitle}>Garden Logger</Text>
+            <Text style={styles.headerTitle}>Garden Tracker</Text>
             <Text style={styles.headerSubtitle}>
               {(searchQuery ? filteredPlants : plants).length}{" "}
               {(searchQuery ? filteredPlants : plants).length === 1
@@ -230,44 +328,27 @@ export default function PlantList() {
   );
 
   const renderPlantCard = ({ item }) => (
-    <Pressable
-      style={({ pressed }) => [
-        styles.plantCard,
-        pressed && styles.plantCardPressed,
-      ]}
+    <PlantCard
+      plant={item}
+      reminder={reminders[item.id]}
       onPress={() => router.push(`/${item.id}`)}
-    >
-      <View style={styles.plantIconContainer}>
-        <Ionicons name="leaf" size={24} color={colors.surface} />
-      </View>
-      <View style={styles.plantInfo}>
-        <Text style={styles.plantName}>{item.name}</Text>
-        <Text style={styles.plantDate}>
-          Added: {item.dateAcquired || "Date not set"}
-        </Text>
-
-        <View style={styles.tagsContainer}>
-          {item.wateringNeeds && (
-            <View style={styles.tag}>
-              <Ionicons name="water" size={14} color={colors.surface} />
-              <Text style={styles.tagText}>{item.wateringNeeds}</Text>
-            </View>
-          )}
-          {item.sunlight && (
-            <View style={styles.tag}>
-              <Ionicons name="sunny" size={14} color={colors.surface} />
-              <Text style={styles.tagText}>{item.sunlight}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-      <Ionicons name="chevron-forward" size={24} color={colors.primary} />
-    </Pressable>
+    />
   );
+
+  const resetAllReminders = async () => {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const reminderKeys = allKeys.filter((key) => key.startsWith("reminder_"));
+      await AsyncStorage.multiRemove(reminderKeys);
+      await fetchPlants(); // Refresh the data
+    } catch (error) {
+      console.log("Error resetting reminders:", error);
+    }
+  };
 
   if (loading) {
     return (
-      <View style={styles.centerContent}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -526,5 +607,15 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     padding: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  listContainer: {
+    flexGrow: 1,
+    paddingTop: 8,
+    paddingBottom: 80,
   },
 });

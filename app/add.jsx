@@ -7,19 +7,30 @@ import {
   Text,
   ScrollView,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { router } from "expo-router";
 import { addPlant } from "../database/database";
 import { globalStyles, colors } from "../styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 export default function AddPlantForm() {
   const [name, setName] = useState("");
   const [dateAcquired, setDateAcquired] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [careInstructions, setCareInstructions] = useState("");
   const [sunlight, setSunlight] = useState("");
   const [soilType, setSoilType] = useState("");
   const [wateringNeeds, setWateringNeeds] = useState("");
+
+  const onDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      const formattedDate = selectedDate.toISOString().split("T")[0];
+      setDateAcquired(formattedDate);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -63,16 +74,10 @@ export default function AddPlantForm() {
 
   return (
     <ScrollView style={globalStyles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { justifyContent: "center" }]}>
         <View style={styles.iconContainer}>
           <Ionicons name="leaf-outline" size={32} color={colors.primary} />
         </View>
-        <TouchableOpacity
-          style={globalStyles.headerButton}
-          onPress={handleBack}
-        >
-          <Ionicons name="close" size={24} color={colors.grey} />
-        </TouchableOpacity>
       </View>
 
       <Text style={globalStyles.label}>Plant Name</Text>
@@ -84,12 +89,29 @@ export default function AddPlantForm() {
       />
 
       <Text style={globalStyles.label}>Date Acquired</Text>
-      <TextInput
-        style={globalStyles.input}
-        placeholder="YYYY-MM-DD"
-        value={dateAcquired}
-        onChangeText={setDateAcquired}
-      />
+      <View style={styles.dateInputContainer}>
+        <TextInput
+          style={[globalStyles.input, styles.dateInput]}
+          placeholder="YYYY-MM-DD"
+          value={dateAcquired}
+          editable={false}
+        />
+        <TouchableOpacity
+          style={styles.calendarButton}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <Ionicons name="calendar" size={24} color={colors.grey} />
+        </TouchableOpacity>
+      </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={dateAcquired ? new Date(dateAcquired) : new Date()}
+          mode="date"
+          display="default"
+          onChange={onDateChange}
+        />
+      )}
 
       <Text style={globalStyles.label}>Care Instructions</Text>
       <TextInput
@@ -143,5 +165,18 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     padding: 8,
+  },
+  dateInputContainer: {
+    position: "relative",
+  },
+  dateInput: {
+    paddingRight: 40, // Make room for the icon
+  },
+  calendarButton: {
+    position: "absolute",
+    right: 8,
+    top: "50%",
+    transform: [{ translateY: -12 }], // Half of the icon size to center it
+    padding: 0,
   },
 });

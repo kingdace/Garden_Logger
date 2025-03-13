@@ -5,15 +5,40 @@ import { globalStyles, colors } from "../styles/globalStyles";
 import { formatDate } from "../utils/dateUtils";
 
 export function CareLogItem({ log }) {
+  const getTypeIcon = (type) => {
+    const lowerType = type.toLowerCase();
+    if (lowerType.includes("water")) return "water";
+    if (lowerType.includes("fertiliz")) return "nutrition";
+    if (lowerType.includes("prun")) return "cut";
+    if (lowerType.includes("repot")) return "flower";
+    return "leaf";
+  };
+
+  const getTypeColor = (type) => {
+    const lowerType = type.toLowerCase();
+    if (lowerType.includes("water")) return colors.primary;
+    if (lowerType.includes("fertiliz")) return colors.success;
+    if (lowerType.includes("prun")) return colors.warning;
+    if (lowerType.includes("repot")) return colors.danger;
+    return colors.grey;
+  };
+
   return (
-    <View style={globalStyles.careLogCard}>
+    <View
+      style={[
+        globalStyles.careLogCard,
+        { borderLeftColor: getTypeColor(log.type), borderLeftWidth: 4 },
+      ]}
+    >
       <View style={globalStyles.row}>
         <Ionicons
-          name={log.type.toLowerCase().includes("water") ? "water" : "leaf"}
+          name={getTypeIcon(log.type)}
           size={20}
-          color={colors.primary}
+          color={getTypeColor(log.type)}
         />
-        <Text style={globalStyles.label}>{log.type}</Text>
+        <Text style={[globalStyles.label, { color: getTypeColor(log.type) }]}>
+          {log.type}
+        </Text>
       </View>
       <Text style={{ color: colors.textSecondary }}>
         Date: {formatDate(log.date)}

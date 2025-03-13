@@ -12,12 +12,14 @@ import { useLocalSearchParams, router } from "expo-router";
 import { addLog } from "../../database/database";
 import { globalStyles, colors } from "../../styles/globalStyles";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 export default function AddCareLog() {
   const { id } = useLocalSearchParams();
   const [type, setType] = useState("");
   const [date, setDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleSubmit = async () => {
     if (!type.trim()) {
@@ -51,18 +53,20 @@ export default function AddCareLog() {
     router.replace(`/${id}`);
   };
 
+  const onDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      const formattedDate = selectedDate.toISOString().split("T")[0];
+      setDate(formattedDate);
+    }
+  };
+
   return (
     <ScrollView style={globalStyles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { justifyContent: "center" }]}>
         <View style={styles.iconContainer}>
           <Ionicons name="calendar-outline" size={32} color={colors.primary} />
         </View>
-        <TouchableOpacity
-          style={globalStyles.headerButton}
-          onPress={handleBack}
-        >
-          <Ionicons name="close" size={24} color={colors.grey} />
-        </TouchableOpacity>
       </View>
 
       <Text style={globalStyles.label}>Care Type *</Text>
@@ -74,12 +78,29 @@ export default function AddCareLog() {
       />
 
       <Text style={globalStyles.label}>Date *</Text>
-      <TextInput
-        style={globalStyles.input}
-        placeholder="YYYY-MM-DD"
-        value={date}
-        onChangeText={setDate}
-      />
+      <View style={styles.dateInputContainer}>
+        <TextInput
+          style={[globalStyles.input, styles.dateInput]}
+          placeholder="YYYY-MM-DD"
+          value={date}
+          editable={false}
+        />
+        <TouchableOpacity
+          style={styles.calendarButton}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <Ionicons name="calendar" size={24} color={colors.grey} />
+        </TouchableOpacity>
+      </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={date ? new Date(date) : new Date()}
+          mode="date"
+          display="default"
+          onChange={onDateChange}
+        />
+      )}
 
       <Text style={globalStyles.label}>Notes</Text>
       <TextInput
@@ -109,5 +130,18 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     padding: 8,
+  },
+  dateInputContainer: {
+    position: "relative",
+  },
+  dateInput: {
+    paddingRight: 40, // Make room for the icon
+  },
+  calendarButton: {
+    position: "absolute",
+    right: 8,
+    top: "50%",
+    transform: [{ translateY: -12 }], // Half of the icon size to center it
+    padding: 0,
   },
 });
